@@ -1,7 +1,7 @@
 ## logrus-rollingfile-hook
 
 
-A [logrus.Hook](https://godoc.org/github.com/Sirupsen/logrus#Hook) which supports file rollover and archive by a given file name pattern.
+A [logrus.Hook](https://godoc.org/github.com/Sirupsen/logrus#Hook) which sends log entry to file and supports file rollover and archive by a given file name pattern.
 
 ## File name pattern
 
