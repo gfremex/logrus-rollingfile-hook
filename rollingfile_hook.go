@@ -32,7 +32,7 @@ func (b *BasicHook) Levels() []logrus.Level {
 type TimeBasedRollingFileHook struct {
 	*BasicHook
 
-	// File name pattern, e.g. /var/log/2006/01/02/access.15.log.gz
+	// File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
 	fileNamePattern string
 
 	// Pointer of the file
@@ -46,7 +46,7 @@ type TimeBasedRollingFileHook struct {
 	mu              *sync.Mutex
 }
 
-// Create a new TimeBasedRollingFileHook
+// Create a new TimeBasedRollingFileHook.
 func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter logrus.Formatter, strFileNamePattern string) (*TimeBasedRollingFileHook, error) {
 	hook := &TimeBasedRollingFileHook{
 		BasicHook: &BasicHook{
