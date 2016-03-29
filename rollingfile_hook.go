@@ -10,27 +10,15 @@ import (
 	"log"
 )
 
-/**
-* Basic Hook is a hook which implements logrus.Hook.
-* Any real hook should extend this hook.
-**/
-type BasicHook struct {
+type TimeBasedRollingFileHook struct {
 	// Id of the hook
-	id        string
+	id              string
 
 	// Log levels allowed
-	levels    []logrus.Level
+	levels          []logrus.Level
 
 	// Log entry formatter
-	formatter logrus.Formatter
-}
-
-func (b *BasicHook) Levels() []logrus.Level {
-	return b.levels
-}
-
-type TimeBasedRollingFileHook struct {
-	*BasicHook
+	formatter       logrus.Formatter
 
 	// File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
 	fileNamePattern string
@@ -47,17 +35,15 @@ type TimeBasedRollingFileHook struct {
 }
 
 // Create a new TimeBasedRollingFileHook.
-func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter logrus.Formatter, strFileNamePattern string) (*TimeBasedRollingFileHook, error) {
-	hook := &TimeBasedRollingFileHook{
-		BasicHook: &BasicHook{
-			id,
-			levels,
-			formatter,
-		},
-		fileNamePattern: strFileNamePattern,
-		queue: make(chan *logrus.Entry, 1000),
-		mu: &sync.Mutex{},
-	}
+func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter logrus.Formatter, fileNamePattern string) (*TimeBasedRollingFileHook, error) {
+	hook := &TimeBasedRollingFileHook{}
+
+	hook.id = id
+	hook.levels = levels
+	hook.formatter = formatter
+	hook.fileNamePattern = fileNamePattern
+	hook.queue = make(chan *logrus.Entry, 1000)
+	hook.mu = &sync.Mutex{}
 
 	// Create new file
 	_, err := hook.rolloverFile()
@@ -276,6 +262,14 @@ func (hook *TimeBasedRollingFileHook) writeEntry() {
 			log.Printf("Error on writing to file: %v\n", err)
 		}
 	}
+}
+
+func (hook *TimeBasedRollingFileHook) Id() string {
+	return hook.id
+}
+
+func (hook *TimeBasedRollingFileHook) Levels() []logrus.Level {
+	return hook.levels
 }
 
 func (hook *TimeBasedRollingFileHook) Fire(entry *logrus.Entry) error {
