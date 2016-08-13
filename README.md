@@ -29,6 +29,14 @@ If fileNamePattern is "**/tmp/tbrfh/2006/01/02/15/minute.04.log.gz**", old file 
 
 ## How to use
 
+### Installation
+
+Assuming you have a working [Go](https://golang.org) setup:
+
+```
+go get github.com/gfremex/logrus-rollingfile-hook
+```
+
 ### Import package
 
 ```Go
