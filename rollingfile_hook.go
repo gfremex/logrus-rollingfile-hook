@@ -1,47 +1,55 @@
 package logrus_rollingfile_hook
 
 import (
-	"github.com/Sirupsen/logrus"
+	"log"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
-	"strings"
-	"path/filepath"
-	"log"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/dchest/uniuri"
 )
 
+// TimeBasedRollingFileHook main rolling file hook struck
 type TimeBasedRollingFileHook struct {
 	// Id of the hook
-	id              string
+	id string
 
 	// Log levels allowed
-	levels          []logrus.Level
+	levels []logrus.Level
 
 	// Log entry formatter
-	formatter       logrus.Formatter
+	formatter logrus.Formatter
 
 	// File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
 	fileNamePattern string
 
 	// Pointer of the file
-	file            *os.File
+	file *os.File
 
 	// Timer to trigger file rollover
-	timer           *time.Timer
+	timer *time.Timer
 
-	queue           chan *logrus.Entry
+	queue chan *logrus.Entry
 
-	mu              *sync.Mutex
+	mu *sync.Mutex
+
+	// IsUUName true: append random suffix to record file name
+	IsUUName bool
 }
 
-// Create a new TimeBasedRollingFileHook.
-func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter logrus.Formatter, fileNamePattern string) (*TimeBasedRollingFileHook, error) {
+// NewTimeBasedRollingFileHook Create a new TimeBasedRollingFileHook.
+func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter logrus.Formatter, fileNamePattern string, isUUName bool) (*TimeBasedRollingFileHook, error) {
 	hook := &TimeBasedRollingFileHook{}
 
 	hook.id = id
 	hook.levels = levels
 	hook.formatter = formatter
 	hook.fileNamePattern = fileNamePattern
+	hook.IsUUName = isUUName
 	hook.queue = make(chan *logrus.Entry, 1000)
 	hook.mu = &sync.Mutex{}
 
@@ -65,11 +73,16 @@ func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter log
 	return hook, nil
 }
 
+// NewRandFileSuffix return a random string file suffix
+func NewRandFileSuffix() string {
+	return uniuri.NewLen(8)
+}
+
 // Calculate duration triggering the next rollover.
 // There are 5 degrees of rollover: per minute, per hour, per day, per month, per year.
 // This function will test each one from the lowest (per minute) to the highest (per year).
 // If 0 or negative returned, it means no more rollovers needed.
-func (hook *TimeBasedRollingFileHook) rolloverAfter() (time.Duration) {
+func (hook *TimeBasedRollingFileHook) rolloverAfter() time.Duration {
 	// Get the current local time
 	t := time.Now().Local()
 
@@ -82,9 +95,7 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() (time.Duration) {
 	newFileName = t1.Format(hook.fileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per minute
-
 		t2 := time.Date(t1.Year(), t1.Month(), t1.Day(), t1.Hour(), t1.Minute(), 0, 0, t1.Location())
-
 		return t2.Sub(t)
 	}
 
@@ -102,7 +113,6 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() (time.Duration) {
 	newFileName = t1.Format(hook.fileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per day
-
 		t2 := time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, t1.Location())
 
 		return t2.Sub(t)
@@ -112,7 +122,6 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() (time.Duration) {
 	newFileName = t1.Format(hook.fileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per month
-
 		t2 := time.Date(t1.Year(), t1.Month(), 1, 0, 0, 0, 0, t1.Location())
 
 		return t2.Sub(t)
@@ -122,7 +131,6 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() (time.Duration) {
 	newFileName = t1.Format(hook.fileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per year
-
 		t2 := time.Date(t1.Year(), 1, 1, 0, 0, 0, 0, t1.Location())
 
 		return t2.Sub(t)
@@ -145,11 +153,18 @@ func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
 	// Forbid output to the hook
 	hook.file = nil
 
+	// oldFileName is oldFileNameOrig removed suffix
 	var oldFileName string
 
 	// Close old file if needed
 	if oldFile != nil {
-		oldFileName = oldFile.Name()
+		oldFileNameOrig := oldFile.Name()
+
+		if hook.IsUUName == true {
+			oldFileName = getFrontFileName(oldFileNameOrig)
+		} else {
+			oldFileName = oldFileNameOrig
+		}
 
 		if err := oldFile.Close(); err != nil {
 			log.Printf("Error on closing old file [%s]: %v\n", oldFileName, err)
@@ -157,25 +172,33 @@ func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
 	}
 
 	// Get new file name
-	newFileName := time.Now().Local().Format(hook.fileNamePattern)
+	newFileNameOrig := time.Now().Local().Format(hook.fileNamePattern)
 
-	switch strings.ToLower(filepath.Ext(newFileName)) {
-	case GzipSuffix: {
-		newFileName = strings.TrimSuffix(newFileName, GzipSuffix)
-	}
+	switch strings.ToLower(filepath.Ext(newFileNameOrig)) {
+	case GzipSuffix:
+		{
+			newFileNameOrig = strings.TrimSuffix(newFileNameOrig, GzipSuffix)
+		}
 	}
 
 	// Create dirs if needed
-	dir := filepath.Dir(newFileName)
+	dir := filepath.Dir(newFileNameOrig)
 
-	err := os.MkdirAll(dir, os.ModeDir | 0755)
+	err := os.MkdirAll(dir, os.ModeDir|0755)
 
 	if err != nil {
 		return oldFileName, err
 	}
 
+	var newFileName string
+	if hook.IsUUName == true {
+		newFileName = newFileNameOrig + "." + NewRandFileSuffix()
+	} else {
+		newFileName = newFileNameOrig
+	}
+
 	// Create new file
-	newFile, err := os.OpenFile(newFileName, os.O_APPEND | os.O_CREATE | os.O_WRONLY, 0664)
+	newFile, err := os.OpenFile(newFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
 
 	if err != nil {
 		return oldFileName, err
@@ -276,4 +299,29 @@ func (hook *TimeBasedRollingFileHook) Fire(entry *logrus.Entry) error {
 	hook.queue <- entry
 
 	return nil
+}
+
+// getFrontFileName get the  front field of filename
+// e.g. filename 06.log.2djiDwOoiNNs will return 06.log
+func getFrontFileName(fileName string) string {
+	filenameWithSuffix := path.Base(fileName)
+	dotIn := strings.Contains(filenameWithSuffix, ".")
+
+	if dotIn == false {
+		return fileName
+	}
+
+	// nameFields := strings.Split(filenameWithSuffix, ".")
+	nameFieldsCount := strings.Count(filenameWithSuffix, ".")
+	if nameFieldsCount < 2 {
+		return fileName
+	}
+
+	fileSuffix := path.Ext(filenameWithSuffix)
+	filenameOnly := strings.TrimSuffix(filenameWithSuffix, fileSuffix)
+
+	dir, _ := path.Split(fileName)
+	frontFileName := dir + filenameOnly
+
+	return frontFileName
 }
