@@ -215,6 +215,18 @@ func (hook *FsrollHook) write(entry *logrus.Entry) error {
 
 	if hook.file != nil {
 		// Writing allowed
+		fileName := hook.file.Name()
+
+		_, err := os.Stat(fileName)
+		if err != nil && os.IsNotExist(err) {
+			recreateFile, err := os.OpenFile(fileName,
+				os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
+
+			if err != nil {
+				log.Printf("Error on creating new file: %v\n", err)
+			}
+			hook.file = recreateFile
+		}
 
 		// Format before writing
 		b, err := hook.formatter.Format(entry)
@@ -235,6 +247,7 @@ func (hook *FsrollHook) write(entry *logrus.Entry) error {
 }
 
 // Write logrus.Entry.
+// if no mesg in hook.queue it while be blocked here
 func (hook *FsrollHook) writeEntry() {
 	for entry := range hook.queue {
 		// Write logrus.Entry to file.
