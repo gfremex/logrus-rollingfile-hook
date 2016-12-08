@@ -3,17 +3,6 @@
 
 A [logrus.Hook](https://godoc.org/github.com/Sirupsen/logrus#Hook) which sends log entry to file and supports file rollover and archive by a given file name pattern.
 
-## Statement:
-
-Referenced project:
-
-**most code source is forket from gfremex's logrus-rollingfile-hook project.**
-
-- gfremex's [logrus-rollingfile-hook](https://github.com/gfremex/logrus-rollingfile-hook).
-
-
-
-
 
 ## File name pattern
 
@@ -104,7 +93,3 @@ logger.Warn("This is a Warn msg")
 
 logger.Error("This is an Error msg")
 ```
-
-#### Complete examples
-
-[examples code](https://github.com/KerwinKoo/fsrollhook/blob/master/examples/tbrfh_example.go)
