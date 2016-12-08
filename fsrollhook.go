@@ -1,4 +1,4 @@
-package logrus_rollingfile_hook
+package fsrollhook
 
 import (
 	"log"
@@ -9,47 +9,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/dchest/uniuri"
+	"github.com/KerwinKoo/logrus"
 )
 
-// TimeBasedRollingFileHook main rolling file hook struck
-type TimeBasedRollingFileHook struct {
-	// Id of the hook
-	id string
-
-	// Log levels allowed
-	levels []logrus.Level
-
-	// Log entry formatter
-	formatter logrus.Formatter
-
-	// File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
-	fileNamePattern string
-
-	// Pointer of the file
-	file *os.File
-
-	// Timer to trigger file rollover
-	timer *time.Timer
-
-	queue chan *logrus.Entry
-
-	mu *sync.Mutex
-
-	// IsUUName true: append random suffix to record file name
-	IsUUName bool
+// FsrollHook main rolling file hook struck
+// File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
+type FsrollHook struct {
+	levels          []logrus.Level   // Log levels allowed
+	formatter       logrus.Formatter // Log entry formatter
+	fileNamePattern string           //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
+	file            *os.File         // Pointer of the file
+	timer           *time.Timer      // Timer to trigger file rollover
+	queue           chan *logrus.Entry
+	mu              *sync.Mutex
 }
 
-// NewTimeBasedRollingFileHook Create a new TimeBasedRollingFileHook.
-func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter logrus.Formatter, fileNamePattern string, isUUName bool) (*TimeBasedRollingFileHook, error) {
-	hook := &TimeBasedRollingFileHook{}
+// NewHook Create a new FsrollHook.
+func NewHook(levels []logrus.Level, formatter logrus.Formatter, fileNamePattern string) (*FsrollHook, error) {
+	hook := &FsrollHook{}
 
-	hook.id = id
 	hook.levels = levels
 	hook.formatter = formatter
 	hook.fileNamePattern = fileNamePattern
-	hook.IsUUName = isUUName
 	hook.queue = make(chan *logrus.Entry, 1000)
 	hook.mu = &sync.Mutex{}
 
@@ -73,16 +54,11 @@ func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter log
 	return hook, nil
 }
 
-// NewRandFileSuffix return a random string file suffix
-func NewRandFileSuffix() string {
-	return uniuri.NewLen(8)
-}
-
 // Calculate duration triggering the next rollover.
 // There are 5 degrees of rollover: per minute, per hour, per day, per month, per year.
 // This function will test each one from the lowest (per minute) to the highest (per year).
 // If 0 or negative returned, it means no more rollovers needed.
-func (hook *TimeBasedRollingFileHook) rolloverAfter() time.Duration {
+func (hook *FsrollHook) rolloverAfter() time.Duration {
 	// Get the current local time
 	t := time.Now().Local()
 
@@ -142,29 +118,19 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() time.Duration {
 // Roll over file.
 // Old file name and error will be returned.
 // If Old file does not exist, empty string will be returned.
-func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
+func (hook *FsrollHook) rolloverFile() (string, error) {
 	// Acquire the lock
 	hook.mu.Lock()
-
 	defer hook.mu.Unlock()
-
 	oldFile := hook.file
 
 	// Forbid output to the hook
 	hook.file = nil
-
-	// oldFileName is oldFileNameOrig removed suffix
 	var oldFileName string
 
 	// Close old file if needed
 	if oldFile != nil {
-		oldFileNameOrig := oldFile.Name()
-
-		if hook.IsUUName == true {
-			oldFileName = getFrontFileName(oldFileNameOrig)
-		} else {
-			oldFileName = oldFileNameOrig
-		}
+		oldFileName = oldFile.Name()
 
 		if err := oldFile.Close(); err != nil {
 			log.Printf("Error on closing old file [%s]: %v\n", oldFileName, err)
@@ -190,15 +156,8 @@ func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
 		return oldFileName, err
 	}
 
-	var newFileName string
-	if hook.IsUUName == true {
-		newFileName = newFileNameOrig + "." + NewRandFileSuffix()
-	} else {
-		newFileName = newFileNameOrig
-	}
-
 	// Create new file
-	newFile, err := os.OpenFile(newFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
+	newFile, err := os.OpenFile(newFileNameOrig, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
 
 	if err != nil {
 		return oldFileName, err
@@ -211,7 +170,7 @@ func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
 }
 
 // Reset timer and archive old file if needed.
-func (hook *TimeBasedRollingFileHook) resetTimer() {
+func (hook *FsrollHook) resetTimer() {
 	// Roll over file
 	oldFileName, err := hook.rolloverFile()
 
@@ -237,7 +196,7 @@ func (hook *TimeBasedRollingFileHook) resetTimer() {
 }
 
 // Archive old file if needed.
-func (hook *TimeBasedRollingFileHook) archiveOldFile(fileName string) {
+func (hook *FsrollHook) archiveOldFile(fileName string) {
 	if archive, ok := Archivers[strings.ToLower(filepath.Ext(hook.fileNamePattern))]; ok {
 		err := archive(fileName)
 
@@ -248,7 +207,7 @@ func (hook *TimeBasedRollingFileHook) archiveOldFile(fileName string) {
 }
 
 // Write logrus.Entry to file.
-func (hook *TimeBasedRollingFileHook) write(entry *logrus.Entry) error {
+func (hook *FsrollHook) write(entry *logrus.Entry) error {
 	// Acquire the lock
 	hook.mu.Lock()
 
@@ -276,7 +235,7 @@ func (hook *TimeBasedRollingFileHook) write(entry *logrus.Entry) error {
 }
 
 // Write logrus.Entry.
-func (hook *TimeBasedRollingFileHook) writeEntry() {
+func (hook *FsrollHook) writeEntry() {
 	for entry := range hook.queue {
 		// Write logrus.Entry to file.
 		err := hook.write(entry)
@@ -287,23 +246,21 @@ func (hook *TimeBasedRollingFileHook) writeEntry() {
 	}
 }
 
-func (hook *TimeBasedRollingFileHook) Id() string {
-	return hook.id
-}
-
-func (hook *TimeBasedRollingFileHook) Levels() []logrus.Level {
+// Levels get levels
+func (hook *FsrollHook) Levels() []logrus.Level {
 	return hook.levels
 }
 
-func (hook *TimeBasedRollingFileHook) Fire(entry *logrus.Entry) error {
+// Fire logrus fire
+func (hook *FsrollHook) Fire(entry *logrus.Entry) error {
 	hook.queue <- entry
 
 	return nil
 }
 
-// getFrontFileName get the  front field of filename
+// GetFrontFileName get the  front field of filename
 // e.g. filename 06.log.2djiDwOoiNNs will return 06.log
-func getFrontFileName(fileName string) string {
+func GetFrontFileName(fileName string) string {
 	filenameWithSuffix := path.Base(fileName)
 	dotIn := strings.Contains(filenameWithSuffix, ".")
 

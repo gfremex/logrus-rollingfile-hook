@@ -1,19 +1,21 @@
-package logrus_rollingfile_hook
+package fsrollhook
 
 import (
-	"testing"
-	"github.com/Sirupsen/logrus"
-	"time"
 	"log"
+	"testing"
+	"time"
+
+	"github.com/KerwinKoo/logrus"
 )
 
 var testPeriod = 200 * time.Millisecond
 
 var testErrChan = make(chan error)
 
-func testTBRFH(hookId, fileNamePattern string, runDuration time.Duration) error {
-	// Create a new TimeBasedRollingFileHook
-	hook, err := NewTimeBasedRollingFileHook(hookId,
+// testTBRFH main test func
+func testTBRFH(hookID, fileNamePattern string, runDuration time.Duration) error {
+	// Create a new FsrollHook
+	hook, err := NewHook(
 		[]logrus.Level{logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel},
 		&logrus.JSONFormatter{},
 		fileNamePattern)
@@ -39,11 +41,11 @@ func testTBRFH(hookId, fileNamePattern string, runDuration time.Duration) error 
 	for i := 0; i < int(loop); i++ {
 		logger.Debugf("No. %7d: This must not be logged", i)
 
-		logger.Infof("No. %7d: %9s", i, hookId)
+		logger.Infof("No. %7d: %9s", i, hookID)
 
-		logger.Warnf("No. %7d: %9s", i, hookId)
+		logger.Warnf("No. %7d: %9s", i, hookID)
 
-		logger.Errorf("No. %7d: %9s", i, hookId)
+		logger.Errorf("No. %7d: %9s", i, hookID)
 
 		time.Sleep(testPeriod)
 	}
@@ -75,7 +77,6 @@ func testRolloverPerHour(runDuration time.Duration) {
 	}()
 
 	go func() {
-
 		// Test with: gzipped, rollover per hour
 		testErrChan <- testTBRFH("hour_gz", "/tmp/tbrfh/2006/01/02/hour_gz.15.log.gz", runDuration)
 
@@ -130,8 +131,8 @@ func testRolloverPerYear(runDuration time.Duration) {
 	}()
 }
 
-func TestTimeBasedRollingFileHook(t *testing.T) {
-	var runDuration = 5 * 60 * 1000 * time.Millisecond
+func TestFsrollHook(t *testing.T) {
+	var runDuration = 6 * 1000 * time.Millisecond
 
 	testRolloverPerMin(runDuration)
 

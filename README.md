@@ -1,7 +1,19 @@
-## logrus-rollingfile-hook
+# fsrollhook
 
 
 A [logrus.Hook](https://godoc.org/github.com/Sirupsen/logrus#Hook) which sends log entry to file and supports file rollover and archive by a given file name pattern.
+
+## Statement:
+
+Referenced project:
+
+**most code source is forket from gfremex's logrus-rollingfile-hook project.**
+
+- gfremex's [logrus-rollingfile-hook](https://github.com/gfremex/logrus-rollingfile-hook).
+
+
+
+
 
 ## File name pattern
 
@@ -34,14 +46,16 @@ If fileNamePattern is "**/tmp/tbrfh/2006/01/02/15/minute.04.log.gz**", old file 
 Assuming you have a working [Go](https://golang.org) setup:
 
 ```
-go get github.com/gfremex/logrus-rollingfile-hook
+go get github.com/KerwinKoo/rollinglog
 ```
 
 ### Import package
 
 ```Go
-import lrh "github.com/gfremex/logrus-rollingfile-hook"
+import lrh "github.com/KerwinKoo/rollinglog"
 ```
+
+`lrh` is the short name of `logrus-rollingfile-hook`.
 
 ### Create a hook (TimeBasedRollingFileHook)
 
@@ -93,4 +107,4 @@ logger.Error("This is an Error msg")
 
 #### Complete examples
 
-[https://github.com/gfremex/logrus-rollingfile-hook/tree/master/examples](https://github.com/gfremex/logrus-rollingfile-hook/tree/master/examples)
+[examples code](https://github.com/KerwinKoo/fsrollhook/blob/master/examples/tbrfh_example.go)

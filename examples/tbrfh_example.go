@@ -1,9 +1,10 @@
 package main
 
-import "github.com/Sirupsen/logrus"
+import "github.com/KerwinKoo/logrus"
 import (
-	lrh "github.com/gfremex/logrus-rollingfile-hook"
 	"time"
+
+	frh "github.com/KerwinKoo/fsrollhook"
 )
 
 func main() {
@@ -25,10 +26,17 @@ func main() {
 	// is created.
 
 	// Create a new TimeBasedRollingFileHook
-	hook, err := lrh.NewTimeBasedRollingFileHook("tbrfh",
+
+	logFormat := &logrus.JSONFormatter{FieldMap: logrus.FieldMap{
+		logrus.FieldKeyMsg:   "",
+		logrus.FieldKeyLevel: "",
+	}}
+	logFormat.TimestampFormat = "2006-01-02 15:04"
+
+	hook, err := frh.NewHook(
 		[]logrus.Level{logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel},
-		&logrus.JSONFormatter{},
-		"/tmp/tbrfh/2006/01/02/15/minute.04.log")
+		logFormat,
+		"/tmp/example/2006/01/02/15/minute.04.log")
 
 	if err != nil {
 		panic(err)
@@ -43,7 +51,7 @@ func main() {
 	// Send message to logger
 	logger.Debugf("This must not be logged")
 
-	logger.Info("This is an Info msg")
+	logger.Info("")
 
 	logger.Warn("This is a Warn msg")
 
