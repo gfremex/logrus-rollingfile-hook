@@ -17,9 +17,10 @@ import (
 type FsrollHook struct {
 	levels          []logrus.Level   // Log levels allowed
 	formatter       logrus.Formatter // Log entry formatter
-	fileNamePattern string           //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
-	file            *os.File         // Pointer of the file
-	timer           *time.Timer      // Timer to trigger file rollover
+	FileNamePattern string           //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
+	ConstantPath    string
+	file            *os.File    // Pointer of the file
+	timer           *time.Timer // Timer to trigger file rollover
 	queue           chan *logrus.Entry
 	mu              *sync.Mutex
 }
@@ -30,7 +31,7 @@ func NewHook(levels []logrus.Level, formatter logrus.Formatter, fileNamePattern 
 
 	hook.levels = levels
 	hook.formatter = formatter
-	hook.fileNamePattern = fileNamePattern
+	hook.FileNamePattern = fileNamePattern
 	hook.queue = make(chan *logrus.Entry, 1000)
 	hook.mu = &sync.Mutex{}
 
@@ -62,13 +63,13 @@ func (hook *FsrollHook) rolloverAfter() time.Duration {
 	// Get the current local time
 	t := time.Now().Local()
 
-	oldFileName := t.Format(hook.fileNamePattern)
+	oldFileName := t.Format(hook.FileNamePattern)
 
 	var t1 time.Time
 	var newFileName string
 
 	t1 = t.Add(time.Minute)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per minute
 		t2 := time.Date(t1.Year(), t1.Month(), t1.Day(), t1.Hour(), t1.Minute(), 0, 0, t1.Location())
@@ -76,7 +77,7 @@ func (hook *FsrollHook) rolloverAfter() time.Duration {
 	}
 
 	t1 = t.Add(time.Hour)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per hour
 
@@ -86,7 +87,7 @@ func (hook *FsrollHook) rolloverAfter() time.Duration {
 	}
 
 	t1 = t.AddDate(0, 0, 1)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per day
 		t2 := time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, t1.Location())
@@ -95,7 +96,7 @@ func (hook *FsrollHook) rolloverAfter() time.Duration {
 	}
 
 	t1 = t.AddDate(0, 1, 0)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per month
 		t2 := time.Date(t1.Year(), t1.Month(), 1, 0, 0, 0, 0, t1.Location())
@@ -104,7 +105,7 @@ func (hook *FsrollHook) rolloverAfter() time.Duration {
 	}
 
 	t1 = t.AddDate(1, 0, 0)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per year
 		t2 := time.Date(t1.Year(), 1, 1, 0, 0, 0, 0, t1.Location())
@@ -138,7 +139,7 @@ func (hook *FsrollHook) rolloverFile() (string, error) {
 	}
 
 	// Get new file name
-	newFileNameOrig := time.Now().Local().Format(hook.fileNamePattern)
+	newFileNameOrig := time.Now().Local().Format(hook.FileNamePattern)
 
 	switch strings.ToLower(filepath.Ext(newFileNameOrig)) {
 	case GzipSuffix:
@@ -197,7 +198,7 @@ func (hook *FsrollHook) resetTimer() {
 
 // Archive old file if needed.
 func (hook *FsrollHook) archiveOldFile(fileName string) {
-	if archive, ok := Archivers[strings.ToLower(filepath.Ext(hook.fileNamePattern))]; ok {
+	if archive, ok := Archivers[strings.ToLower(filepath.Ext(hook.FileNamePattern))]; ok {
 		err := archive(fileName)
 
 		if err != nil {
