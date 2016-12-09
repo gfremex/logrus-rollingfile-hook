@@ -16,16 +16,17 @@ import (
 // FsrollHook main rolling file hook struck
 // File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
 type FsrollHook struct {
-	levels          []logrus.Level   // Log levels allowed
-	formatter       logrus.Formatter // Log entry formatter
-	file            *os.File         // Pointer of the file
-	timer           *time.Timer      // Timer to trigger file rollover
-	queue           chan *logrus.Entry
-	mu              *sync.Mutex
-	fixedIndexs     []int
-	fixedFields     []string
-	rollerPattern   string
-	FileNamePattern string //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
+	levels           []logrus.Level   // Log levels allowed
+	formatter        logrus.Formatter // Log entry formatter
+	file             *os.File         // Pointer of the file
+	timer            *time.Timer      // Timer to trigger file rollover
+	queue            chan *logrus.Entry
+	mu               *sync.Mutex
+	fixedIndexs      []int
+	fixedFields      []string
+	patternBufString string
+	rollerPattern    string
+	FileNamePattern  string //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
 }
 
 // NewHook Create a new FsrollHook.
@@ -39,9 +40,14 @@ func NewHook(levels []logrus.Level,
 	hook.FileNamePattern = fileNamePattern
 	hook.queue = make(chan *logrus.Entry, 1000)
 	hook.mu = &sync.Mutex{}
+	hook.patternBufString = ""
 
 	// Create new file
 	hook.getRollerPattern()
+
+	if hook.patternBufString == "" {
+		hook.patternBufString = hook.FileNamePattern
+	}
 	_, err := hook.rolloverFile()
 	if err != nil {
 		log.Printf("Error on creating new file: %v\n", err)
@@ -311,23 +317,33 @@ func (hook *FsrollHook) getRollerPattern() {
 		if perChar == rune('{') { //"using {} for brackets tample"
 			if bracketStart == false && len(hook.FileNamePattern) > i+1 {
 				bracketStart = true
-				startI = i + 1
+				startI = i
+				buffer.WriteString(hook.FileNamePattern[origStart:startI])
 			}
 		}
 
 		if perChar == rune('}') {
 			if bracketStart == true {
-				endI = i - 1
-				hook.fixedFields = append(hook.fixedFields, hook.FileNamePattern[startI-1:endI+2])
+				endI = i
+				hook.fixedFields = append(hook.fixedFields, hook.FileNamePattern[startI+1:endI]) //skipped '{}'
 				hook.fixedIndexs = append(hook.fixedIndexs, startI)
-				buffer.WriteString(hook.FileNamePattern[origStart+1 : endI+1])
+
 				origStart = i + 1
 				bracketStart = false
 			}
 		}
 	}
 
-	log.Println("hook.fixedFields", hook.fixedFields)
-	log.Println("hook.fixedIndexs", hook.fixedIndexs)
-	log.Println("buffer", buffer.String())
+	runes := []rune(hook.FileNamePattern)
+	if endI != len(runes)-1 {
+		buffer.WriteString(hook.FileNamePattern[endI+1:])
+	}
+
+	// log.Println("hook.fixedFields", hook.fixedFields)
+	// log.Println("hook.fixedIndexs", hook.fixedIndexs)
+	// log.Println("buffer", buffer.String())
+
+	if len(hook.fixedFields) == len(hook.fixedIndexs) {
+		hook.patternBufString = buffer.String()
+	}
 }

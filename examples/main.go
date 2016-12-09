@@ -32,7 +32,7 @@ func main() {
 	hook, err := frh.NewHook(
 		[]logrus.Level{logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel},
 		logFormat,
-		"{55555}/{hello003}2006/01/02.log")
+		"x{55555}/{hello003}/{}2006/01/02.log{2006}")
 
 	if err != nil {
 		panic(err)
