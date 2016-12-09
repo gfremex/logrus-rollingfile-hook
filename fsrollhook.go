@@ -1,6 +1,7 @@
 package fsrollhook
 
 import (
+	"bytes"
 	"log"
 	"os"
 	"path"
@@ -40,6 +41,7 @@ func NewHook(levels []logrus.Level,
 	hook.mu = &sync.Mutex{}
 
 	// Create new file
+	hook.getRollerPattern()
 	_, err := hook.rolloverFile()
 	if err != nil {
 		log.Printf("Error on creating new file: %v\n", err)
@@ -298,25 +300,34 @@ func GetFrontFileName(fileName string) string {
 	return frontFileName
 }
 
-// func (hook *FsrollHook) getRollerPattern() {
-// 	hook.rollerPattern = ""
-// 	bracketStart := false
-// 	startI := 0
-// 	endI := 0
-// 	var buffer bytes.Buffer
-// 	for i, perChar := range hook.FileNamePattern {
-// 		if bracketStart == false {
+func (hook *FsrollHook) getRollerPattern() {
+	hook.rollerPattern = ""
+	bracketStart := false
+	origStart := 0
+	startI := 0
+	endI := 0
+	var buffer bytes.Buffer
+	for i, perChar := range hook.FileNamePattern {
+		if perChar == rune('{') { //"using {} for brackets tample"
+			if bracketStart == false && len(hook.FileNamePattern) > i+1 {
+				bracketStart = true
+				startI = i + 1
+			}
+		}
 
-// 			if perChar == rune('{') {
-// 				bracketStart = true
-// 				startI = i
-// 			}
-// 		}
+		if perChar == rune('}') {
+			if bracketStart == true {
+				endI = i - 1
+				hook.fixedFields = append(hook.fixedFields, hook.FileNamePattern[startI-1:endI+2])
+				hook.fixedIndexs = append(hook.fixedIndexs, startI)
+				buffer.WriteString(hook.FileNamePattern[origStart+1 : endI+1])
+				origStart = i + 1
+				bracketStart = false
+			}
+		}
+	}
 
-// 		if bracketStart == true {
-// 			endI = i
-// 			hook.fixedFields = append(hook.fixedFields, hook.FileNamePattern[startI:endI])
-// 			hook.fixedIndexs = append(hook.fixedIndexs, startI)
-// 		}
-// 	}
-// }
+	log.Println("hook.fixedFields", hook.fixedFields)
+	log.Println("hook.fixedIndexs", hook.fixedIndexs)
+	log.Println("buffer", buffer.String())
+}
