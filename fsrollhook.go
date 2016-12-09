@@ -298,20 +298,25 @@ func GetFrontFileName(fileName string) string {
 	return frontFileName
 }
 
-func (hook *FsrollHook) getRollerPattern() {
-	hook.rollerPattern = ""
-	bracketStart := false
-	for i, perChar := range hook.FileNamePattern {
-		if perChar == "{" && bracketStart == false {
+// func (hook *FsrollHook) getRollerPattern() {
+// 	hook.rollerPattern = ""
+// 	bracketStart := false
+// 	startI := 0
+// 	endI := 0
+// 	var buffer bytes.Buffer
+// 	for i, perChar := range hook.FileNamePattern {
+// 		if bracketStart == false {
 
-		} else {
-			break
-		}
-	}
+// 			if perChar == rune('{') {
+// 				bracketStart = true
+// 				startI = i
+// 			}
+// 		}
 
-	if rollerPattern == "" {
-		return fileNamePattern
-	} else {
-		return rollerPattern
-	}
-}
+// 		if bracketStart == true {
+// 			endI = i
+// 			hook.fixedFields = append(hook.fixedFields, hook.FileNamePattern[startI:endI])
+// 			hook.fixedIndexs = append(hook.fixedIndexs, startI)
+// 		}
+// 	}
+// }
