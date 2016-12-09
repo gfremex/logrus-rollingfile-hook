@@ -17,18 +17,22 @@ import (
 type FsrollHook struct {
 	levels          []logrus.Level   // Log levels allowed
 	formatter       logrus.Formatter // Log entry formatter
-	FileNamePattern string           //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
-	ConstantPath    string
-	file            *os.File    // Pointer of the file
-	timer           *time.Timer // Timer to trigger file rollover
+	file            *os.File         // Pointer of the file
+	timer           *time.Timer      // Timer to trigger file rollover
 	queue           chan *logrus.Entry
 	mu              *sync.Mutex
+	fixedIndexs     []int
+	fixedFields     []string
+	rollerPattern   string
+	FileNamePattern string //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
 }
 
 // NewHook Create a new FsrollHook.
-func NewHook(levels []logrus.Level, formatter logrus.Formatter, fileNamePattern string) (*FsrollHook, error) {
-	hook := &FsrollHook{}
+func NewHook(levels []logrus.Level,
+	formatter logrus.Formatter,
+	fileNamePattern string) (*FsrollHook, error) {
 
+	hook := &FsrollHook{}
 	hook.levels = levels
 	hook.formatter = formatter
 	hook.FileNamePattern = fileNamePattern
@@ -37,21 +41,18 @@ func NewHook(levels []logrus.Level, formatter logrus.Formatter, fileNamePattern 
 
 	// Create new file
 	_, err := hook.rolloverFile()
-
 	if err != nil {
 		log.Printf("Error on creating new file: %v\n", err)
 	}
 
 	// Calculate duration triggering the next rollover
 	d := hook.rolloverAfter()
-
 	if d.Nanoseconds() > 0 {
 		hook.timer = time.AfterFunc(d, hook.resetTimer)
 	}
 
 	// Write logrus.Entry
 	go hook.writeEntry()
-
 	return hook, nil
 }
 
@@ -295,4 +296,22 @@ func GetFrontFileName(fileName string) string {
 	frontFileName := dir + filenameOnly
 
 	return frontFileName
+}
+
+func (hook *FsrollHook) getRollerPattern() {
+	hook.rollerPattern = ""
+	bracketStart := false
+	for i, perChar := range hook.FileNamePattern {
+		if perChar == "{" && bracketStart == false {
+
+		} else {
+			break
+		}
+	}
+
+	if rollerPattern == "" {
+		return fileNamePattern
+	} else {
+		return rollerPattern
+	}
 }
