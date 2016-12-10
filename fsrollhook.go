@@ -43,11 +43,11 @@ func NewHook(levels []logrus.Level,
 	hook.patternBufString = ""
 
 	// Create new file
-	hook.getRollerPattern()
+	// hook.getRollerPattern()
 
-	if hook.patternBufString == "" {
-		hook.patternBufString = hook.FileNamePattern
-	}
+	// if hook.patternBufString == "" {
+	// 	hook.patternBufString = hook.FileNamePattern
+	// }
 	_, err := hook.rolloverFile()
 	if err != nil {
 		log.Printf("Error on creating new file: %v\n", err)
