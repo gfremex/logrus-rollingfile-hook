@@ -159,9 +159,7 @@ func (hook *FsrollHook) rolloverFile() (string, error) {
 
 	// Create dirs if needed
 	dir := filepath.Dir(newFileNameOrig)
-
 	err := os.MkdirAll(dir, os.ModeDir|0755)
-
 	if err != nil {
 		return oldFileName, err
 	}
@@ -190,7 +188,6 @@ func (hook *FsrollHook) resetTimer() {
 
 	// Calculate duration triggering the next rollover
 	d := hook.rolloverAfter()
-
 	if d.Nanoseconds() > 0 {
 		// Reset timer
 		hook.timer.Reset(d)
@@ -240,14 +237,12 @@ func (hook *FsrollHook) write(entry *logrus.Entry) error {
 
 		// Format before writing
 		b, err := hook.formatter.Format(entry)
-
 		if err != nil {
 			return err
 		}
 
 		// Writing to file
 		_, err = hook.file.Write(b)
-
 		if err != nil {
 			return err
 		}
@@ -262,7 +257,6 @@ func (hook *FsrollHook) writeEntry() {
 	for entry := range hook.queue {
 		// Write logrus.Entry to file.
 		err := hook.write(entry)
-
 		if err != nil {
 			log.Printf("Error on writing to file: %v\n", err)
 		}
