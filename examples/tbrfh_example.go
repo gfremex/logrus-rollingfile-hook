@@ -49,15 +49,15 @@ func main() {
 
 	// Create a new TimeBasedRollingFileHook
 
-	// logFormat := &logrus.JSONFormatter{FieldMap: logrus.FieldMap{
-	// 	logrus.FieldKeyMsg:   "msg",
-	// 	logrus.FieldKeyLevel: "lvl",
-	// 	logrus.FieldKeyTime:  "",
-	// }}
+	logFormat := &logrus.JSONFormatter{FieldMap: logrus.FieldMap{
+		logrus.FieldKeyMsg:   "msg",
+		logrus.FieldKeyLevel: "lvl",
+		logrus.FieldKeyTime:  "",
+	}}
 
 	// logFormat.TimestampFormat = "2006-01-02 15:04"
 
-	logFormat := &logrus.TextFormatter{}
+	// logFormat := &logrus.TextFormatter{}
 
 	hook, err := frh.NewHook(
 		[]logrus.Level{logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel},
