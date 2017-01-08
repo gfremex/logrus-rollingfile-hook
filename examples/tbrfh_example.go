@@ -51,7 +51,7 @@ func main() {
 	// Send message to logger
 	logger.Debugf("This must not be logged")
 
-	logger.Info("")
+	logger.Info("") //void but be recorded
 
 	logger.Warn("This is a Warn msg")
 
