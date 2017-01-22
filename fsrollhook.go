@@ -220,11 +220,19 @@ func (hook *FsrollHook) write(entry *logrus.Entry) error {
 
 		_, err := os.Stat(fileName)
 		if err != nil && os.IsNotExist(err) {
+			dir := filepath.Dir(fileName)
+			err := os.MkdirAll(dir, os.ModeDir|0755)
+			if err != nil {
+				log.Printf("Error on create Dir: %v\n", err)
+				return err
+			}
+
 			recreateFile, err := os.OpenFile(fileName,
 				os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
 
 			if err != nil {
 				log.Printf("Error on creating new file: %v\n", err)
+				return err
 			}
 			hook.file = recreateFile
 		}
@@ -256,6 +264,7 @@ func (hook *FsrollHook) writeEntry() {
 
 		if err != nil {
 			log.Printf("Error on writing to file: %v\n", err)
+			return
 		}
 	}
 }
