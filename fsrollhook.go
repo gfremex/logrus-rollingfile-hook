@@ -15,14 +15,15 @@ import (
 // FsrollHook main rolling file hook struck
 // File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
 type FsrollHook struct {
-	levels          []logrus.Level   // Log levels allowed
-	formatter       logrus.Formatter // Log entry formatter
-	FileNamePattern string           //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
-	ConstantPath    string
-	file            *os.File    // Pointer of the file
-	timer           *time.Timer // Timer to trigger file rollover
-	queue           chan *logrus.Entry
-	mu              *sync.Mutex
+	levels            []logrus.Level   // Log levels allowed
+	formatter         logrus.Formatter // Log entry formatter
+	FileNamePattern   string           //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
+	ConstantPath      string
+	file              *os.File    // Pointer of the file
+	timer             *time.Timer // Timer to trigger file rollover
+	queue             chan *logrus.Entry
+	mu                *sync.Mutex
+	LogFileNameSuffix string
 }
 
 // NewHook Create a new FsrollHook.
@@ -141,6 +142,9 @@ func (hook *FsrollHook) rolloverFile() (string, error) {
 	// Get new file name
 	newFileNameOrig := time.Now().Local().Format(hook.FileNamePattern)
 
+	if hook.LogFileNameSuffix != "" {
+		newFileNameOrig += hook.LogFileNameSuffix
+	}
 	switch strings.ToLower(filepath.Ext(newFileNameOrig)) {
 	case GzipSuffix:
 		{
@@ -279,6 +283,11 @@ func (hook *FsrollHook) Fire(entry *logrus.Entry) error {
 	hook.queue <- entry
 
 	return nil
+}
+
+// AddSuffix add suffix to the end of log's file name
+func (hook *FsrollHook) AddSuffix(suffix string) {
+	hook.LogFileNameSuffix = suffix
 }
 
 // GetFrontFileName get the  front field of filename
