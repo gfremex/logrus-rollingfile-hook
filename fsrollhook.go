@@ -27,7 +27,7 @@ type FsrollHook struct {
 }
 
 // NewHook Create a new FsrollHook.
-func NewHook(levels []logrus.Level, formatter logrus.Formatter, fileNamePattern string) (*FsrollHook, error) {
+func NewHook(levels []logrus.Level, formatter logrus.Formatter, fileNamePattern, suffix string) (*FsrollHook, error) {
 	hook := &FsrollHook{}
 
 	hook.levels = levels
@@ -35,6 +35,7 @@ func NewHook(levels []logrus.Level, formatter logrus.Formatter, fileNamePattern 
 	hook.FileNamePattern = fileNamePattern
 	hook.queue = make(chan *logrus.Entry, 1000)
 	hook.mu = &sync.Mutex{}
+	hook.LogFileNameSuffix = suffix
 
 	// Create new file
 	_, err := hook.rolloverFile()
