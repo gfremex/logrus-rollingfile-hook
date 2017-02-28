@@ -1,7 +1,6 @@
 package fsrollhook
 
 import (
-	"bytes"
 	"log"
 	"os"
 	"path"
@@ -16,51 +15,45 @@ import (
 // FsrollHook main rolling file hook struck
 // File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
 type FsrollHook struct {
-	levels           []logrus.Level   // Log levels allowed
-	formatter        logrus.Formatter // Log entry formatter
-	file             *os.File         // Pointer of the file
-	timer            *time.Timer      // Timer to trigger file rollover
-	queue            chan *logrus.Entry
-	mu               *sync.Mutex
-	fixedIndexs      []int
-	fixedFields      []string
-	patternBufString string
-	rollerPattern    string
-	FileNamePattern  string //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
+	levels            []logrus.Level   // Log levels allowed
+	formatter         logrus.Formatter // Log entry formatter
+	FileNamePattern   string           //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
+	ConstantPath      string
+	file              *os.File    // Pointer of the file
+	timer             *time.Timer // Timer to trigger file rollover
+	queue             chan *logrus.Entry
+	mu                *sync.Mutex
+	LogFileNameSuffix string
 }
 
 // NewHook Create a new FsrollHook.
-func NewHook(levels []logrus.Level,
-	formatter logrus.Formatter,
-	fileNamePattern string) (*FsrollHook, error) {
-
+func NewHook(levels []logrus.Level, formatter logrus.Formatter, fileNamePattern, suffix string) (*FsrollHook, error) {
 	hook := &FsrollHook{}
+
 	hook.levels = levels
 	hook.formatter = formatter
 	hook.FileNamePattern = fileNamePattern
 	hook.queue = make(chan *logrus.Entry, 1000)
 	hook.mu = &sync.Mutex{}
-	hook.patternBufString = ""
+	hook.LogFileNameSuffix = suffix
 
 	// Create new file
-	// hook.getRollerPattern()
-
-	// if hook.patternBufString == "" {
-	// 	hook.patternBufString = hook.FileNamePattern
-	// }
 	_, err := hook.rolloverFile()
+
 	if err != nil {
 		log.Printf("Error on creating new file: %v\n", err)
 	}
 
 	// Calculate duration triggering the next rollover
 	d := hook.rolloverAfter()
+
 	if d.Nanoseconds() > 0 {
 		hook.timer = time.AfterFunc(d, hook.resetTimer)
 	}
 
 	// Write logrus.Entry
 	go hook.writeEntry()
+
 	return hook, nil
 }
 
@@ -150,6 +143,9 @@ func (hook *FsrollHook) rolloverFile() (string, error) {
 	// Get new file name
 	newFileNameOrig := time.Now().Local().Format(hook.FileNamePattern)
 
+	if hook.LogFileNameSuffix != "" {
+		newFileNameOrig += hook.LogFileNameSuffix
+	}
 	switch strings.ToLower(filepath.Ext(newFileNameOrig)) {
 	case GzipSuffix:
 		{
@@ -159,7 +155,9 @@ func (hook *FsrollHook) rolloverFile() (string, error) {
 
 	// Create dirs if needed
 	dir := filepath.Dir(newFileNameOrig)
+
 	err := os.MkdirAll(dir, os.ModeDir|0755)
+
 	if err != nil {
 		return oldFileName, err
 	}
@@ -188,6 +186,7 @@ func (hook *FsrollHook) resetTimer() {
 
 	// Calculate duration triggering the next rollover
 	d := hook.rolloverAfter()
+
 	if d.Nanoseconds() > 0 {
 		// Reset timer
 		hook.timer.Reset(d)
@@ -226,23 +225,33 @@ func (hook *FsrollHook) write(entry *logrus.Entry) error {
 
 		_, err := os.Stat(fileName)
 		if err != nil && os.IsNotExist(err) {
+			dir := filepath.Dir(fileName)
+			err := os.MkdirAll(dir, os.ModeDir|0755)
+			if err != nil {
+				log.Printf("Error on create Dir: %v\n", err)
+				return err
+			}
+
 			recreateFile, err := os.OpenFile(fileName,
 				os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
 
 			if err != nil {
 				log.Printf("Error on creating new file: %v\n", err)
+				return err
 			}
 			hook.file = recreateFile
 		}
 
 		// Format before writing
 		b, err := hook.formatter.Format(entry)
+
 		if err != nil {
 			return err
 		}
 
 		// Writing to file
 		_, err = hook.file.Write(b)
+
 		if err != nil {
 			return err
 		}
@@ -257,8 +266,10 @@ func (hook *FsrollHook) writeEntry() {
 	for entry := range hook.queue {
 		// Write logrus.Entry to file.
 		err := hook.write(entry)
+
 		if err != nil {
 			log.Printf("Error on writing to file: %v\n", err)
+			return
 		}
 	}
 }
@@ -273,6 +284,11 @@ func (hook *FsrollHook) Fire(entry *logrus.Entry) error {
 	hook.queue <- entry
 
 	return nil
+}
+
+// AddSuffix add suffix to the end of log's file name
+func (hook *FsrollHook) AddSuffix(suffix string) {
+	hook.LogFileNameSuffix = suffix
 }
 
 // GetFrontFileName get the  front field of filename
@@ -298,46 +314,4 @@ func GetFrontFileName(fileName string) string {
 	frontFileName := dir + filenameOnly
 
 	return frontFileName
-}
-
-func (hook *FsrollHook) getRollerPattern() {
-	hook.rollerPattern = ""
-	bracketStart := false
-	origStart := 0
-	startI := 0
-	endI := 0
-	var buffer bytes.Buffer
-	for i, perChar := range hook.FileNamePattern {
-		if perChar == rune('{') { //"using {} for brackets tample"
-			if bracketStart == false && len(hook.FileNamePattern) > i+1 {
-				bracketStart = true
-				startI = i
-				buffer.WriteString(hook.FileNamePattern[origStart:startI])
-			}
-		}
-
-		if perChar == rune('}') {
-			if bracketStart == true {
-				endI = i
-				hook.fixedFields = append(hook.fixedFields, hook.FileNamePattern[startI+1:endI]) //skipped '{}'
-				hook.fixedIndexs = append(hook.fixedIndexs, startI)
-
-				origStart = i + 1
-				bracketStart = false
-			}
-		}
-	}
-
-	runes := []rune(hook.FileNamePattern)
-	if endI != len(runes)-1 {
-		buffer.WriteString(hook.FileNamePattern[endI+1:])
-	}
-
-	// log.Println("hook.fixedFields", hook.fixedFields)
-	// log.Println("hook.fixedIndexs", hook.fixedIndexs)
-	// log.Println("buffer", buffer.String())
-
-	if len(hook.fixedFields) == len(hook.fixedIndexs) {
-		hook.patternBufString = buffer.String()
-	}
 }

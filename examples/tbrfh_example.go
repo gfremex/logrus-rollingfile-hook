@@ -1,11 +1,33 @@
 package main
 
-import "github.com/KerwinKoo/logrus"
 import (
+	"encoding/json"
+	"fmt"
 	"time"
+
+	"github.com/KerwinKoo/logrus"
+
+	"log"
 
 	frh "github.com/KerwinKoo/fsrollhook"
 )
+
+type MyJSONFormatter struct {
+}
+
+// logrus.SetFormatter(new(MyJSONFormatter))
+
+func (f *MyJSONFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	// Note this doesn't include Time, Level and Message which are available on
+	// the Entry. Consult `godoc` on information about those fields or read the
+	// source of the official loggers.
+	serialized, err := json.Marshal(entry.Data)
+	log.Println("entry is ", entry.Data)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to marshal fields to JSON, %v", err)
+	}
+	return append(serialized, '\n'), nil
+}
 
 func main() {
 	// fileNamePattern is a string including date/time layouts as used in time.Time.format().
@@ -27,16 +49,21 @@ func main() {
 
 	// Create a new TimeBasedRollingFileHook
 
-	logFormat := &logrus.JSONFormatter{FieldMap: logrus.FieldMap{
-		logrus.FieldKeyMsg:   "",
-		logrus.FieldKeyLevel: "",
-	}}
-	logFormat.TimestampFormat = "2006-01-02 15:04"
+	// logFormat := &logrus.JSONFormatter{FieldMap: logrus.FieldMap{
+	// 	logrus.FieldKeyMsg:   "msg",
+	// 	logrus.FieldKeyLevel: "lvl",
+	// 	logrus.FieldKeyTime:  "",
+	// }}
+
+	// logFormat.TimestampFormat = "2006-01-02 15:04"
+
+	logFormat := &logrus.TextFormatter{}
+	logFormat.DisableColors = true
 
 	hook, err := frh.NewHook(
 		[]logrus.Level{logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel},
 		logFormat,
-		"/tmp/example/2006/01/02/15/minute.04.log")
+		"hhh/2006/01.log")
 
 	if err != nil {
 		panic(err)
@@ -51,12 +78,11 @@ func main() {
 	// Send message to logger
 	logger.Debugf("This must not be logged")
 
-	logger.Info("")
+	logger.Info("") //void but be recorded
 
 	logger.Warn("This is a Warn msg")
 
 	logger.Error("This is an Error msg")
-
 	// Ensure log messages were written to file
 	time.Sleep(time.Second)
 }
