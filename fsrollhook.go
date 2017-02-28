@@ -1,49 +1,41 @@
-package logrus_rollingfile_hook
+package fsrollhook
 
 import (
-	"github.com/Sirupsen/logrus"
+	"log"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
-	"strings"
-	"path/filepath"
-	"log"
+
+	"github.com/KerwinKoo/logrus"
 )
 
-type TimeBasedRollingFileHook struct {
-	// Id of the hook
-	id              string
-
-	// Log levels allowed
-	levels          []logrus.Level
-
-	// Log entry formatter
-	formatter       logrus.Formatter
-
-	// File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
-	fileNamePattern string
-
-	// Pointer of the file
-	file            *os.File
-
-	// Timer to trigger file rollover
-	timer           *time.Timer
-
-	queue           chan *logrus.Entry
-
-	mu              *sync.Mutex
+// FsrollHook main rolling file hook struck
+// File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
+type FsrollHook struct {
+	levels            []logrus.Level   // Log levels allowed
+	formatter         logrus.Formatter // Log entry formatter
+	FileNamePattern   string           //e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
+	ConstantPath      string
+	file              *os.File    // Pointer of the file
+	timer             *time.Timer // Timer to trigger file rollover
+	queue             chan *logrus.Entry
+	mu                *sync.Mutex
+	LogFileNameSuffix string
 }
 
-// Create a new TimeBasedRollingFileHook.
-func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter logrus.Formatter, fileNamePattern string) (*TimeBasedRollingFileHook, error) {
-	hook := &TimeBasedRollingFileHook{}
+// NewHook Create a new FsrollHook.
+func NewHook(levels []logrus.Level, formatter logrus.Formatter, fileNamePattern, suffix string) (*FsrollHook, error) {
+	hook := &FsrollHook{}
 
-	hook.id = id
 	hook.levels = levels
 	hook.formatter = formatter
-	hook.fileNamePattern = fileNamePattern
+	hook.FileNamePattern = fileNamePattern
 	hook.queue = make(chan *logrus.Entry, 1000)
 	hook.mu = &sync.Mutex{}
+	hook.LogFileNameSuffix = suffix
 
 	// Create new file
 	_, err := hook.rolloverFile()
@@ -69,27 +61,25 @@ func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter log
 // There are 5 degrees of rollover: per minute, per hour, per day, per month, per year.
 // This function will test each one from the lowest (per minute) to the highest (per year).
 // If 0 or negative returned, it means no more rollovers needed.
-func (hook *TimeBasedRollingFileHook) rolloverAfter() (time.Duration) {
+func (hook *FsrollHook) rolloverAfter() time.Duration {
 	// Get the current local time
 	t := time.Now().Local()
 
-	oldFileName := t.Format(hook.fileNamePattern)
+	oldFileName := t.Format(hook.FileNamePattern)
 
 	var t1 time.Time
 	var newFileName string
 
 	t1 = t.Add(time.Minute)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per minute
-
 		t2 := time.Date(t1.Year(), t1.Month(), t1.Day(), t1.Hour(), t1.Minute(), 0, 0, t1.Location())
-
 		return t2.Sub(t)
 	}
 
 	t1 = t.Add(time.Hour)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per hour
 
@@ -99,30 +89,27 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() (time.Duration) {
 	}
 
 	t1 = t.AddDate(0, 0, 1)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per day
-
 		t2 := time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, t1.Location())
 
 		return t2.Sub(t)
 	}
 
 	t1 = t.AddDate(0, 1, 0)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per month
-
 		t2 := time.Date(t1.Year(), t1.Month(), 1, 0, 0, 0, 0, t1.Location())
 
 		return t2.Sub(t)
 	}
 
 	t1 = t.AddDate(1, 0, 0)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = t1.Format(hook.FileNamePattern)
 	if oldFileName != newFileName {
 		// Need to rollover per year
-
 		t2 := time.Date(t1.Year(), 1, 1, 0, 0, 0, 0, t1.Location())
 
 		return t2.Sub(t)
@@ -134,17 +121,14 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() (time.Duration) {
 // Roll over file.
 // Old file name and error will be returned.
 // If Old file does not exist, empty string will be returned.
-func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
+func (hook *FsrollHook) rolloverFile() (string, error) {
 	// Acquire the lock
 	hook.mu.Lock()
-
 	defer hook.mu.Unlock()
-
 	oldFile := hook.file
 
 	// Forbid output to the hook
 	hook.file = nil
-
 	var oldFileName string
 
 	// Close old file if needed
@@ -157,25 +141,29 @@ func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
 	}
 
 	// Get new file name
-	newFileName := time.Now().Local().Format(hook.fileNamePattern)
+	newFileNameOrig := time.Now().Local().Format(hook.FileNamePattern)
 
-	switch strings.ToLower(filepath.Ext(newFileName)) {
-	case GzipSuffix: {
-		newFileName = strings.TrimSuffix(newFileName, GzipSuffix)
+	if hook.LogFileNameSuffix != "" {
+		newFileNameOrig += hook.LogFileNameSuffix
 	}
+	switch strings.ToLower(filepath.Ext(newFileNameOrig)) {
+	case GzipSuffix:
+		{
+			newFileNameOrig = strings.TrimSuffix(newFileNameOrig, GzipSuffix)
+		}
 	}
 
 	// Create dirs if needed
-	dir := filepath.Dir(newFileName)
+	dir := filepath.Dir(newFileNameOrig)
 
-	err := os.MkdirAll(dir, os.ModeDir | 0755)
+	err := os.MkdirAll(dir, os.ModeDir|0755)
 
 	if err != nil {
 		return oldFileName, err
 	}
 
 	// Create new file
-	newFile, err := os.OpenFile(newFileName, os.O_APPEND | os.O_CREATE | os.O_WRONLY, 0664)
+	newFile, err := os.OpenFile(newFileNameOrig, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
 
 	if err != nil {
 		return oldFileName, err
@@ -188,7 +176,7 @@ func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
 }
 
 // Reset timer and archive old file if needed.
-func (hook *TimeBasedRollingFileHook) resetTimer() {
+func (hook *FsrollHook) resetTimer() {
 	// Roll over file
 	oldFileName, err := hook.rolloverFile()
 
@@ -214,8 +202,8 @@ func (hook *TimeBasedRollingFileHook) resetTimer() {
 }
 
 // Archive old file if needed.
-func (hook *TimeBasedRollingFileHook) archiveOldFile(fileName string) {
-	if archive, ok := Archivers[strings.ToLower(filepath.Ext(hook.fileNamePattern))]; ok {
+func (hook *FsrollHook) archiveOldFile(fileName string) {
+	if archive, ok := Archivers[strings.ToLower(filepath.Ext(hook.FileNamePattern))]; ok {
 		err := archive(fileName)
 
 		if err != nil {
@@ -225,7 +213,7 @@ func (hook *TimeBasedRollingFileHook) archiveOldFile(fileName string) {
 }
 
 // Write logrus.Entry to file.
-func (hook *TimeBasedRollingFileHook) write(entry *logrus.Entry) error {
+func (hook *FsrollHook) write(entry *logrus.Entry) error {
 	// Acquire the lock
 	hook.mu.Lock()
 
@@ -233,6 +221,26 @@ func (hook *TimeBasedRollingFileHook) write(entry *logrus.Entry) error {
 
 	if hook.file != nil {
 		// Writing allowed
+		fileName := hook.file.Name()
+
+		_, err := os.Stat(fileName)
+		if err != nil && os.IsNotExist(err) {
+			dir := filepath.Dir(fileName)
+			err := os.MkdirAll(dir, os.ModeDir|0755)
+			if err != nil {
+				log.Printf("Error on create Dir: %v\n", err)
+				return err
+			}
+
+			recreateFile, err := os.OpenFile(fileName,
+				os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
+
+			if err != nil {
+				log.Printf("Error on creating new file: %v\n", err)
+				return err
+			}
+			hook.file = recreateFile
+		}
 
 		// Format before writing
 		b, err := hook.formatter.Format(entry)
@@ -253,27 +261,57 @@ func (hook *TimeBasedRollingFileHook) write(entry *logrus.Entry) error {
 }
 
 // Write logrus.Entry.
-func (hook *TimeBasedRollingFileHook) writeEntry() {
+// if no mesg in hook.queue it while be blocked here
+func (hook *FsrollHook) writeEntry() {
 	for entry := range hook.queue {
 		// Write logrus.Entry to file.
 		err := hook.write(entry)
 
 		if err != nil {
 			log.Printf("Error on writing to file: %v\n", err)
+			return
 		}
 	}
 }
 
-func (hook *TimeBasedRollingFileHook) Id() string {
-	return hook.id
-}
-
-func (hook *TimeBasedRollingFileHook) Levels() []logrus.Level {
+// Levels get levels
+func (hook *FsrollHook) Levels() []logrus.Level {
 	return hook.levels
 }
 
-func (hook *TimeBasedRollingFileHook) Fire(entry *logrus.Entry) error {
+// Fire logrus fire
+func (hook *FsrollHook) Fire(entry *logrus.Entry) error {
 	hook.queue <- entry
 
 	return nil
+}
+
+// AddSuffix add suffix to the end of log's file name
+func (hook *FsrollHook) AddSuffix(suffix string) {
+	hook.LogFileNameSuffix = suffix
+}
+
+// GetFrontFileName get the  front field of filename
+// e.g. filename 06.log.2djiDwOoiNNs will return 06.log
+func GetFrontFileName(fileName string) string {
+	filenameWithSuffix := path.Base(fileName)
+	dotIn := strings.Contains(filenameWithSuffix, ".")
+
+	if dotIn == false {
+		return fileName
+	}
+
+	// nameFields := strings.Split(filenameWithSuffix, ".")
+	nameFieldsCount := strings.Count(filenameWithSuffix, ".")
+	if nameFieldsCount < 2 {
+		return fileName
+	}
+
+	fileSuffix := path.Ext(filenameWithSuffix)
+	filenameOnly := strings.TrimSuffix(filenameWithSuffix, fileSuffix)
+
+	dir, _ := path.Split(fileName)
+	frontFileName := dir + filenameOnly
+
+	return frontFileName
 }
