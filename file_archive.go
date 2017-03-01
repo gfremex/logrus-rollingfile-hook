@@ -1,4 +1,4 @@
-package logrus_rollingfile_hook
+package fsrollhook
 
 import (
 	"os"
