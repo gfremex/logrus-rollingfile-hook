@@ -1,7 +1,7 @@
 ## logrus-rollingfile-hook
 
 
-A [logrus.Hook](https://godoc.org/github.com/Sirupsen/logrus#Hook) which sends log entry to file and supports file rollover and archive by a given file name pattern.
+A [logrus.Hook](https://godoc.org/github.com/sirupsen/logrus#Hook) which sends log entry to file and supports file rollover and archive by a given file name pattern.
 
 ## File name pattern
 
@@ -42,8 +42,8 @@ NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter logrus.F
 ```
 
 - id: Hook Id
-- levels: [logrus.Levels](https://godoc.org/github.com/Sirupsen/logrus#Level) supported by the hook
-- formatter: [logrus.Formatter](https://godoc.org/github.com/Sirupsen/logrus#Formatter) used by the hook
+- levels: [logrus.Levels](https://godoc.org/github.com/sirupsen/logrus#Level) supported by the hook
+- formatter: [logrus.Formatter](https://godoc.org/github.com/sirupsen/logrus#Formatter) used by the hook
 - fileNamePattern: File name pattern
 
 For example:
@@ -55,7 +55,7 @@ hook, err := lrh.NewTimeBasedRollingFileHook("tbrfh",
 		"/tmp/tbrfh/2006/01/02/15/minute.04.log")
 ```
 
-### Create a [logrus.Logger](https://godoc.org/github.com/Sirupsen/logrus#Logger)
+### Create a [logrus.Logger](https://godoc.org/github.com/sirupsen/logrus#Logger)
 
 For example:
 

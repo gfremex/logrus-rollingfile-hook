@@ -1,8 +1,8 @@
 package main
 
-import "github.com/Sirupsen/logrus"
 import (
 	lrh "github.com/gfremex/logrus-rollingfile-hook"
+	"github.com/sirupsen/logrus"
 	"time"
 )
 

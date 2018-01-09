@@ -1,9 +1,9 @@
 package logrus_rollingfile_hook
 
 import (
-	"os"
 	"compress/gzip"
 	"io"
+	"os"
 )
 
 const (
@@ -22,7 +22,7 @@ func gzipArchive(fileName string) error {
 	gzFileName := fileName + GzipSuffix
 
 	// Create .gz file
-	gzFile, err := os.OpenFile(gzFileName, os.O_APPEND | os.O_CREATE | os.O_WRONLY, 0664)
+	gzFile, err := os.OpenFile(gzFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
 
 	if err != nil {
 		return err

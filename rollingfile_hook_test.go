@@ -1,10 +1,10 @@
 package logrus_rollingfile_hook
 
 import (
-	"testing"
-	"github.com/Sirupsen/logrus"
-	"time"
+	"github.com/sirupsen/logrus"
 	"log"
+	"testing"
+	"time"
 )
 
 var testPeriod = 200 * time.Millisecond

@@ -1,37 +1,37 @@
 package logrus_rollingfile_hook
 
 import (
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
+	"log"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
-	"strings"
-	"path/filepath"
-	"log"
 )
 
 type TimeBasedRollingFileHook struct {
 	// Id of the hook
-	id              string
+	id string
 
 	// Log levels allowed
-	levels          []logrus.Level
+	levels []logrus.Level
 
 	// Log entry formatter
-	formatter       logrus.Formatter
+	formatter logrus.Formatter
 
 	// File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
 	fileNamePattern string
 
 	// Pointer of the file
-	file            *os.File
+	file *os.File
 
 	// Timer to trigger file rollover
-	timer           *time.Timer
+	timer *time.Timer
 
-	queue           chan *logrus.Entry
+	queue chan *logrus.Entry
 
-	mu              *sync.Mutex
+	mu *sync.Mutex
 }
 
 // Create a new TimeBasedRollingFileHook.
@@ -69,7 +69,7 @@ func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter log
 // There are 5 degrees of rollover: per minute, per hour, per day, per month, per year.
 // This function will test each one from the lowest (per minute) to the highest (per year).
 // If 0 or negative returned, it means no more rollovers needed.
-func (hook *TimeBasedRollingFileHook) rolloverAfter() (time.Duration) {
+func (hook *TimeBasedRollingFileHook) rolloverAfter() time.Duration {
 	// Get the current local time
 	t := time.Now().Local()
 
@@ -160,22 +160,23 @@ func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
 	newFileName := time.Now().Local().Format(hook.fileNamePattern)
 
 	switch strings.ToLower(filepath.Ext(newFileName)) {
-	case GzipSuffix: {
-		newFileName = strings.TrimSuffix(newFileName, GzipSuffix)
-	}
+	case GzipSuffix:
+		{
+			newFileName = strings.TrimSuffix(newFileName, GzipSuffix)
+		}
 	}
 
 	// Create dirs if needed
 	dir := filepath.Dir(newFileName)
 
-	err := os.MkdirAll(dir, os.ModeDir | 0755)
+	err := os.MkdirAll(dir, os.ModeDir|0755)
 
 	if err != nil {
 		return oldFileName, err
 	}
 
 	// Create new file
-	newFile, err := os.OpenFile(newFileName, os.O_APPEND | os.O_CREATE | os.O_WRONLY, 0664)
+	newFile, err := os.OpenFile(newFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
 
 	if err != nil {
 		return oldFileName, err
