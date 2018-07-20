@@ -1,13 +1,16 @@
 package logrus_rollingfile_hook
 
 import (
-	"github.com/sirupsen/logrus"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/lestrrat-go/strftime"
+	"github.com/sirupsen/logrus"
 )
 
 type TimeBasedRollingFileHook struct {
@@ -20,8 +23,8 @@ type TimeBasedRollingFileHook struct {
 	// Log entry formatter
 	formatter logrus.Formatter
 
-	// File name pattern, e.g. /tmp/tbrfh/2006/01/02/15/minute.04.log
-	fileNamePattern string
+	// Time formatter
+	timeFormatter *strftime.Strftime
 
 	// Pointer of the file
 	file *os.File
@@ -36,20 +39,28 @@ type TimeBasedRollingFileHook struct {
 
 // Create a new TimeBasedRollingFileHook.
 func NewTimeBasedRollingFileHook(id string, levels []logrus.Level, formatter logrus.Formatter, fileNamePattern string) (*TimeBasedRollingFileHook, error) {
+	var err error
+
 	hook := &TimeBasedRollingFileHook{}
 
 	hook.id = id
 	hook.levels = levels
 	hook.formatter = formatter
-	hook.fileNamePattern = fileNamePattern
+
+	hook.timeFormatter, err = strftime.New(fileNamePattern)
+
+	if err != nil {
+		return nil, fmt.Errorf("Invalid file name pattern: %v", err)
+	}
+
 	hook.queue = make(chan *logrus.Entry, 1000)
 	hook.mu = &sync.Mutex{}
 
 	// Create new file
-	_, err := hook.rolloverFile()
+	_, err = hook.rolloverFile()
 
 	if err != nil {
-		log.Printf("Error on creating new file: %v\n", err)
+		return nil, fmt.Errorf("Error on creating new file: %v", err)
 	}
 
 	// Calculate duration triggering the next rollover
@@ -73,13 +84,13 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() time.Duration {
 	// Get the current local time
 	t := time.Now().Local()
 
-	oldFileName := t.Format(hook.fileNamePattern)
+	oldFileName := hook.timeFormatter.FormatString(t)
 
 	var t1 time.Time
 	var newFileName string
 
 	t1 = t.Add(time.Minute)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = hook.timeFormatter.FormatString(t1)
 	if oldFileName != newFileName {
 		// Need to rollover per minute
 
@@ -89,7 +100,7 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() time.Duration {
 	}
 
 	t1 = t.Add(time.Hour)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = hook.timeFormatter.FormatString(t1)
 	if oldFileName != newFileName {
 		// Need to rollover per hour
 
@@ -99,7 +110,7 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() time.Duration {
 	}
 
 	t1 = t.AddDate(0, 0, 1)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = hook.timeFormatter.FormatString(t1)
 	if oldFileName != newFileName {
 		// Need to rollover per day
 
@@ -109,7 +120,7 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() time.Duration {
 	}
 
 	t1 = t.AddDate(0, 1, 0)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = hook.timeFormatter.FormatString(t1)
 	if oldFileName != newFileName {
 		// Need to rollover per month
 
@@ -119,7 +130,7 @@ func (hook *TimeBasedRollingFileHook) rolloverAfter() time.Duration {
 	}
 
 	t1 = t.AddDate(1, 0, 0)
-	newFileName = t1.Format(hook.fileNamePattern)
+	newFileName = hook.timeFormatter.FormatString(t1)
 	if oldFileName != newFileName {
 		// Need to rollover per year
 
@@ -157,12 +168,12 @@ func (hook *TimeBasedRollingFileHook) rolloverFile() (string, error) {
 	}
 
 	// Get new file name
-	newFileName := time.Now().Local().Format(hook.fileNamePattern)
+	newFileName := hook.timeFormatter.FormatString(time.Now().Local())
 
 	switch strings.ToLower(filepath.Ext(newFileName)) {
 	case GzipSuffix:
 		{
-			newFileName = strings.TrimSuffix(newFileName, GzipSuffix)
+			newFileName = newFileName[:len(newFileName)-len(GzipSuffix)]
 		}
 	}
 
@@ -216,7 +227,7 @@ func (hook *TimeBasedRollingFileHook) resetTimer() {
 
 // Archive old file if needed.
 func (hook *TimeBasedRollingFileHook) archiveOldFile(fileName string) {
-	if archive, ok := Archivers[strings.ToLower(filepath.Ext(hook.fileNamePattern))]; ok {
+	if archive, ok := Archivers[strings.ToLower(filepath.Ext(hook.timeFormatter.Pattern()))]; ok {
 		err := archive(fileName)
 
 		if err != nil {

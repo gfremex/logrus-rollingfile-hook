@@ -1,10 +1,11 @@
 package logrus_rollingfile_hook
 
 import (
-	"github.com/sirupsen/logrus"
 	"log"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 var testPeriod = 200 * time.Millisecond
@@ -55,13 +56,13 @@ func testRolloverPerMin(runDuration time.Duration) {
 	go func() {
 
 		// Test with: non-gzipped, rollover per minute
-		testErrChan <- testTBRFH("minute", "/tmp/tbrfh/2006/01/02/15/minute.04.log", runDuration)
+		testErrChan <- testTBRFH("minute", "/tmp/tbrfh/%Y/%m/%d/%H/minute.%M.log", runDuration)
 	}()
 
 	go func() {
 
 		// Test with: gzipped, rollover per minute
-		testErrChan <- testTBRFH("minute_gz", "/tmp/tbrfh/2006/01/02/15/minute_gz.04.log.gz", runDuration)
+		testErrChan <- testTBRFH("minute_gz", "/tmp/tbrfh/%Y/%m/%d/%H/minute_gz.%M.log.gz", runDuration)
 
 	}()
 }
@@ -70,14 +71,14 @@ func testRolloverPerHour(runDuration time.Duration) {
 	go func() {
 
 		// Test with: non-gzipped, rollover per hour
-		testErrChan <- testTBRFH("hour", "/tmp/tbrfh/2006/01/02/hour.15.log", runDuration)
+		testErrChan <- testTBRFH("hour", "/tmp/tbrfh/%Y/%m/%d/hour.%H.log", runDuration)
 
 	}()
 
 	go func() {
 
 		// Test with: gzipped, rollover per hour
-		testErrChan <- testTBRFH("hour_gz", "/tmp/tbrfh/2006/01/02/hour_gz.15.log.gz", runDuration)
+		testErrChan <- testTBRFH("hour_gz", "/tmp/tbrfh/%Y/%m/%d/hour_gz.%H.log.gz", runDuration)
 
 	}()
 }
@@ -86,14 +87,14 @@ func testRolloverPerDay(runDuration time.Duration) {
 	go func() {
 
 		// Test with: non-gzipped, rollover per day
-		testErrChan <- testTBRFH("day", "/tmp/tbrfh/2006/01/day.02.log", runDuration)
+		testErrChan <- testTBRFH("day", "/tmp/tbrfh/%Y/%m/day.%d.log", runDuration)
 
 	}()
 
 	go func() {
 
 		// Test with: gzipped, rollover per day
-		testErrChan <- testTBRFH("day_gz", "/tmp/tbrfh/2006/01/day_gz.02.log.gz", runDuration)
+		testErrChan <- testTBRFH("day_gz", "/tmp/tbrfh/%Y/%m/day_gz.%d.log.gz", runDuration)
 
 	}()
 }
@@ -102,14 +103,14 @@ func testRolloverPerMonth(runDuration time.Duration) {
 	go func() {
 
 		// Test with: non-gzipped, rollover per month
-		testErrChan <- testTBRFH("month", "/tmp/tbrfh/2006/month.01.log", runDuration)
+		testErrChan <- testTBRFH("month", "/tmp/tbrfh/%Y/month.%m.log", runDuration)
 
 	}()
 
 	go func() {
 
 		// Test with: gzipped, rollover per month
-		testErrChan <- testTBRFH("month_gz", "/tmp/tbrfh/2006/month_gz.01.log.gz", runDuration)
+		testErrChan <- testTBRFH("month_gz", "/tmp/tbrfh/%Y/month_gz.%m.log.gz", runDuration)
 
 	}()
 }
@@ -118,14 +119,14 @@ func testRolloverPerYear(runDuration time.Duration) {
 	go func() {
 
 		// Test with: non-gzipped, rollover per year
-		testErrChan <- testTBRFH("year", "/tmp/tbrfh/year.2006.log", runDuration)
+		testErrChan <- testTBRFH("year", "/tmp/tbrfh/year.%Y.log", runDuration)
 
 	}()
 
 	go func() {
 
 		// Test with: gzipped, rollover per year
-		testErrChan <- testTBRFH("year_gz", "/tmp/tbrfh/year_gz.2006.log.gz", runDuration)
+		testErrChan <- testTBRFH("year_gz", "/tmp/tbrfh/year_gz.%Y.log.gz", runDuration)
 
 	}()
 }
